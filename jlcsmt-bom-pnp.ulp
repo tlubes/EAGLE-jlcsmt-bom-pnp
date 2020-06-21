@@ -1,0 +1,146 @@
+#usage "<b>BOM and PNP file generation for the JLCSMT assembly service</b>\n"
+       "<p>"
+       "Generates a proper PNP  and BOM file to fulfill an order at JLCSMT assembly service."
+       "Also takes current LCSC library in consideration to cross reference available parts (under development)."
+       "<p>"
+       "<author>Author: tlubes@quantumintegrate.com</author>"
+
+// yes, only the absolute paths work here ... same for the python script
+string python_path = "/Library/Frameworks/Python.framework/Versions/3.7/bin/python3";
+string script_path = "/Users/tlubes/Documents/EAGLE/development/jlcsmt/main.py";
+
+if (board) board(B) {
+  if(project.schematic){
+
+    string tempTopData = "";
+    string tempBottomData = "";
+    string topSMD = "";
+    string bottomSMD = "";
+    string cmdData = "";
+
+    // formatting constants
+    string sideDivider = "^";
+    string partDivider = "+";
+    string propDivider = "~";
+    
+    // iterate through top parts and add them to the command
+    B.elements(E) if (E.populate) {
+
+      string curLibrary;
+      string curDevice;
+      int wasSmd,
+        xmax =-2147483648,
+        xmin = 2147483647,
+        ymax = xmax,
+        ymin = xmin;
+
+      wasSmd = 0;
+
+      E.footprint.contacts(C) {
+        if (C.smd && C.smd.layer == 1) {
+          wasSmd = 1;
+
+          if (C.x > xmax) xmax = C.x;
+          if (C.y > ymax) ymax = C.y;
+          if (C.x < xmin) xmin = C.x;
+          if (C.y < ymin) ymin = C.y;
+        }
+      }
+
+      project.schematic(S){
+        S.parts(P){
+          if(P.name == E.name){
+            curLibrary = P.device.library;
+            curDevice = P.device.name;
+            break;
+          }
+        }
+      }
+
+      string temp = "";
+      if (wasSmd){
+        sprintf(temp, "%s%s%5.4f%s%5.4f%s%3.0f%s%s%s%s%s%s%s%s%s",
+        E.name, propDivider, u2mm((xmin + xmax)/2), 
+        propDivider, u2mm((ymin + ymax)/2), propDivider,
+        E.angle, propDivider, E.value, propDivider, 
+      E.package.name, propDivider, curLibrary,
+        propDivider, curDevice, partDivider);
+      }
+      tempTopData += temp;
+    }
+    if(strlen(tempTopData)){
+      topSMD = strsub(tempTopData, 0, strlen(tempTopData) - 1);
+    }
+
+    // iterate through bottom parts and add them to the command
+    B.elements(E) if (E.populate) {
+
+      string curLibrary;
+      string curDevice;
+      int wasSmd,
+        xmax =-2147483648,
+        xmin = 2147483647,
+        ymax = xmax,
+        ymin = xmin;
+
+      wasSmd = 0;
+
+      E.footprint.contacts(C) {
+        if (C.smd && C.smd.layer == 16) {
+          wasSmd = 1;
+
+          if (C.x > xmax) xmax = C.x;
+          if (C.y > ymax) ymax = C.y;
+          if (C.x < xmin) xmin = C.x;
+          if (C.y < ymin) ymin = C.y;
+        }
+      }
+
+      project.schematic(S){
+        S.parts(P){
+          if(P.name == E.name){
+            curLibrary = P.device.library;
+            curDevice = P.device.name;
+            break;
+          }
+        }
+      }
+
+      string temp = "";
+      if (wasSmd){
+        sprintf(temp, "%s%s%5.4f%s%5.4f%s%3.0f%s%s%s%s%s%s%s%s%s",
+        E.name, propDivider, u2mm((xmin + xmax)/2), 
+        propDivider, u2mm((ymin + ymax)/2), propDivider,
+        E.angle, propDivider, E.value, propDivider, 
+        E.package.name, propDivider, curLibrary,
+        propDivider, curDevice, partDivider);
+      }
+      tempBottomData += temp;
+    }
+
+   // prepare the command
+    string pythonCall;
+    string cmdArray[];
+    
+    if(strlen(tempBottomData)){
+      bottomSMD = strsub(tempBottomData, 0, strlen(tempBottomData) - 1);
+    }
+
+    sprintf(cmdData, "%s%s", topSMD, sideDivider);
+
+    cmdData += bottomSMD;
+    // could not remove whitespaces so just replace them with _ and fix in python script
+    strsplit(cmdArray, cmdData, ' ');
+    cmdData = strjoin(cmdArray, '_');
+
+    sprintf(pythonCall, "%s %s %s", python_path, script_path, cmdData);
+    // transition to the python script
+    system(pythonCall);
+    dlgMessageBox("DONE! Please check the generated files.", "OK");
+  } else {
+    dlgMessageBox("!\n    Make sure the schematic is open as well!    \n");
+  }
+} else {
+   dlgMessageBox("!\n    Start this ULP in a board!    \n");
+   exit (0);
+}
