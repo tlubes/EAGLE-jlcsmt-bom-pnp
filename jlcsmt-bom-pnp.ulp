@@ -132,10 +132,12 @@ if (board) board(B) {
     // could not remove whitespaces so just replace them with _ and fix in python script
     strsplit(cmdArray, cmdData, ' ');
     cmdData = strjoin(cmdArray, '_');
-
-    sprintf(pythonCall, "%s %s %s", python_path, script_path, cmdData);
+    strsplit(cmdArray, cmdData, '&');
+    cmdData = strjoin(cmdArray, 'ß');
+    sprintf(pythonCall, "%s %s '%s'", python_path, script_path, cmdData);
     // transition to the python script
     system(pythonCall);
+
     dlgMessageBox("DONE! Please check the generated files.", "OK");
   } else {
     dlgMessageBox("!\n    Make sure the schematic is open as well!    \n");
